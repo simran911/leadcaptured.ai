@@ -1978,7 +1978,7 @@ input[type="range"]::-webkit-slider-thumb {
   }
 
   .calculator-section .section-heading h1 br:first-of-type {
-    display: none;
+    display: block;
   }
 
   .calculator-card-heading {
@@ -2021,7 +2021,8 @@ input[type="range"]::-webkit-slider-thumb {
 
   .calculator-card-heading {
     margin-bottom: 24px;
-    padding-inline: 38px 0;
+    padding-inline: 52px;
+    text-align: center;
   }
 
   .calculator-card-heading h2 {
