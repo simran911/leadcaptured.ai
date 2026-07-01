@@ -4,34 +4,29 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 const faqs = [
   {
-    question: "How quickly can I get started?",
+    question: "Q1. What do I need to get started?",
     answer:
-      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
+      "A1. Just schedule a Q&A/setup Zoom call below, and we can start your 30-day trial in a couple of days.",
   },
   {
-    question: "Do I need to provide my own phone number?",
+    question: "Q2. What is the setup procedure?",
     answer:
-      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
+      "A2. It's simple. It takes five minutes. You just put your number on call forwarding.",
   },
   {
-    question: "What if I need to cancel?",
+    question: "Q3. What else do I get?",
     answer:
-      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
+      "A3. We give you a reporting site that shows all of your traffic stats and a summary of each call. You also get a calendar to track your customer meetings and recordings of every call.",
   },
   {
-    question: "How does the AI learn about my business?",
+    question: "Q4. Can I customize the system?",
     answer:
-      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
+      "A4. Yes, everything is customized for your unique business, including all of the responses.",
   },
   {
-    question: "Can I customize the AI's responses?",
+    question: "Q5. What does it cost?",
     answer:
-      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
-  },
-  {
-    question: "What kind of support do you offer?",
-    answer:
-      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
+      "A5. The 30-day test is FREE (no credit card required). Thereafter, the pricing is FIXED at $397/mo. or VARIABLE at $100/booking. (If you get just one extra job, it pays for a year of service. You can cancel anytime.) We will discuss more pricing details during our free Q&A/Set-Up Zoom call.",
   },
 ];
 
@@ -89,7 +84,6 @@ function Calculator() {
   const [missedCalls, setMissedCalls] = useState(15);
   const [jobValue, setJobValue] = useState(9000);
   const [closeRate, setCloseRate] = useState(30);
-  const [helpOpen, setHelpOpen] = useState(false);
   const productCost = 4764;
 
   const totals = useMemo(() => {
@@ -111,21 +105,15 @@ function Calculator() {
       <div className="section-heading">
         <h1>
           ROOFERS: Calculate how much you<br />
-          are losing
+          are losing...
           <br />
           <span>by using voicemail</span>
         </h1>
       </div>
 
+      <div className="instructions-button">INSTRUCTIONS</div>
+
       <div className="calculator-card">
-        <button
-          className="help-button"
-          type="button"
-          onClick={() => setHelpOpen(true)}
-          aria-label="Open calculator instructions"
-        >
-          <span className="help-play-icon" aria-hidden="true" />
-        </button>
         <div className="calculator-card-heading">
           <h2>
             Your <span>Real Loss Calculator</span>
@@ -173,30 +161,6 @@ function Calculator() {
           </div>
         </div>
       </div>
-
-      {helpOpen && (
-        <div className="help-modal" role="dialog" aria-modal="true" aria-label="Calculator instructions">
-          <div className="help-modal-panel">
-            <button
-              className="help-modal-close"
-              type="button"
-              onClick={() => setHelpOpen(false)}
-              aria-label="Close calculator instructions"
-            >
-              X
-            </button>
-            <h3>INSTRUCTIONS</h3>
-            <p>
-              Step 1 - Adjust top slider to show the number of calls that go to voicemail in a
-              WEEK. Total your after-hours and weekend calls, then add in those you miss during
-              working hours.
-            </p>
-            <p>Step 2 - Enter your average job size by adjusting the middle slider.</p>
-            <p>Step 3 - In the bottom slider, put the average percentage of bids you win.</p>
-            <p>Step 4 - See the results and rejoice.</p>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
@@ -381,6 +345,12 @@ function VoiceAgentDemo({
         <h2 id="voice-agent-title">Meet Jessica,<br />Your Very Smart New<br />Receptionist</h2>
       </div>
 
+      <img
+        className="voice-agent-portrait"
+        src="/jessica-receptionist.png"
+        alt="Jessica AI receptionist"
+      />
+
       <div className="voice-agent-card">
         <p className="voice-agent-cta">
           Call{" "}
@@ -396,10 +366,6 @@ function VoiceAgentDemo({
         aria-label={callActive ? "End AI voice call" : "Talk with Jessica"}
         aria-pressed={callActive}
       >
-        <img
-          src="https://widgets.leadconnectorhq.com/chat-widget/assets/defaultVoiceAiFemale.png"
-          alt=""
-        />
         {callActive ? (
           <span className="voice-call-status">
             <span className="voice-status-top">
@@ -423,7 +389,7 @@ function VoiceAgentDemo({
             <span className="voice-call-duration">{formatCallDuration(elapsedSeconds)}</span>
           </span>
         ) : (
-          <strong>TALK HERE</strong>
+          <strong>TALK TO ME</strong>
         )}
         <span className="voice-phone-icon" aria-hidden="true">
           <Icon name="phone" />

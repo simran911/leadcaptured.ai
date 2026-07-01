@@ -2374,3 +2374,49 @@ input[type="range"]::-webkit-slider-thumb {
     top: 22px;
   }
 }
+.instructions-button {
+  align-items: center;
+  animation: voiceButtonAttention 1.35s ease-in-out infinite;
+  background: #fff;
+  border: 2px solid #e7373f;
+  border-radius: 999px;
+  color: #182522;
+  display: inline-flex;
+  font-size: 13px;
+  font-weight: 900;
+  height: 30px;
+  justify-content: center;
+  letter-spacing: 0;
+  line-height: 1;
+  margin: 18px auto 46px;
+  padding: 0 42px;
+  position: relative;
+  z-index: 2;
+}
+
+@media (max-width: 620px) {
+  .instructions-button {
+    font-size: 12px;
+    height: 28px;
+    margin: 14px auto 34px;
+    padding-inline: 34px;
+  }
+}
+.voice-agent-portrait {
+  aspect-ratio: 1;
+  border: 8px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 18px 34px rgba(16, 33, 31, 0.22);
+  display: block;
+  margin: -18px auto -12px;
+  object-fit: cover;
+  width: clamp(118px, 9vw, 156px);
+}
+
+@media (max-width: 620px) {
+  .voice-agent-portrait {
+    border-width: 6px;
+    margin: -8px auto -6px;
+    width: 112px;
+  }
+}
