@@ -6,32 +6,32 @@ const faqs = [
   {
     question: "How quickly can I get started?",
     answer:
-      "Most roofing companies can be live in one day after adding business details, services, and availability.",
+      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
   },
   {
     question: "Do I need to provide my own phone number?",
     answer:
-      "No. We can provide a dedicated number or help route calls from your existing business number.",
+      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
   },
   {
     question: "What if I need to cancel?",
     answer:
-      "You can cancel anytime during your trial or afterward. There are no long-term commitments.",
+      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
   },
   {
     question: "How does the AI learn about my business?",
     answer:
-      "You provide your service area, pricing notes, booking rules, and FAQs, then the receptionist follows your playbook.",
+      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
   },
   {
     question: "Can I customize the AI's responses?",
     answer:
-      "Yes. You can tailor greetings, qualification questions, handoff rules, and booking preferences.",
+      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
   },
   {
     question: "What kind of support do you offer?",
     answer:
-      "We help with setup, call routing, launch checks, and ongoing optimization as your call volume grows.",
+      "Our AI receptionist can be fully configured and live within 24 hours of signing up. We provide a simple onboarding process where you input your business details, services, and calendar availability, and our system takes care of the rest.",
   },
 ];
 
@@ -384,8 +384,8 @@ function VoiceAgentDemo({
       <div className="voice-agent-card">
         <p className="voice-agent-cta">
           Call{" "}
-          <a className="voice-phone-link" href="tel:14159681500">
-            415-968-1500
+          <a className="voice-phone-link" href="tel:+18885903060">
+            (888) 590-3060
           </a>{" "}
           or click this button.
         </p>
