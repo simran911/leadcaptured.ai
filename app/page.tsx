@@ -26,7 +26,12 @@ const faqs = [
   {
     question: "Q5. What does it cost?",
     answer:
-      "A5. The 30-day test is FREE (no credit card required). Thereafter, the pricing is FIXED at $397/mo. or VARIABLE at $100/booking. (If you get just one extra job, it pays for a year of service. You can cancel anytime.) We will discuss more pricing details during our free Q&A/Set-Up Zoom call.",
+      "A5. The 30-day test is free (no credit card required). Thereafter, the pricing is fixed at $397 per month (One new job will pay for a year of service.) OR no fixed fee. Instead, just $250 for each new roof job coming from leads we provide. — You can cancel anytime. — We answer other questions on the 20 min Zoom call.",
+  },
+  {
+    question: "Q6. Do you have customer reviews?",
+    answer:
+      "A6. We're early — Jessica is brand new. Instead of asking you to trust reviews, we'd rather you call her yourself right now and judge for yourself. That's the fastest proof we can offer.",
   },
 ];
 
@@ -46,6 +51,8 @@ type VoiceLeadResponse = {
     appointmentAccepted?: boolean;
   }) | null;
 };
+
+const INSTRUCTIONS_WIDGET_ID = "6a46a9536e972e21b6fb19eb";
 
 declare global {
   interface Window {
@@ -111,7 +118,14 @@ function Calculator() {
         </h1>
       </div>
 
-      <div className="instructions-button">INSTRUCTIONS</div>
+      <button
+        className="instructions-button"
+        type="button"
+        onClick={openInstructionsAgent}
+        aria-label="Play instructions"
+      >
+        INSTRUCTIONS
+      </button>
 
       <div className="calculator-card">
         <div className="calculator-card-heading">
@@ -225,8 +239,14 @@ function getVoiceWidget() {
     | null;
 }
 
-function clickWidgetControl(patterns: RegExp[]) {
-  const root = getVoiceWidget()?.shadowRoot;
+function getVoiceWidgets() {
+  return Array.from(document.querySelectorAll("chat-widget")) as Array<
+    HTMLElement & { shadowRoot?: ShadowRoot | null }
+  >;
+}
+
+function clickWidgetControl(patterns: RegExp[], widget = getVoiceWidget()) {
+  const root = widget?.shadowRoot;
 
   if (!root) {
     return false;
@@ -252,6 +272,61 @@ function clickWidgetControl(patterns: RegExp[]) {
   control?.click();
 
   return Boolean(control);
+}
+
+function waitForInstructionWidget(previousCount: number) {
+  return new Promise<HTMLElement & { shadowRoot?: ShadowRoot | null }>((resolve) => {
+    let attempts = 0;
+
+    const checkForWidget = () => {
+      attempts += 1;
+      const widgets = getVoiceWidgets();
+      const widget = widgets[widgets.length - 1];
+
+      if (widgets.length > previousCount && widget?.shadowRoot) {
+        resolve(widget);
+        return;
+      }
+
+      if (attempts >= 30) {
+        resolve(widget ?? getVoiceWidget());
+        return;
+      }
+
+      window.setTimeout(checkForWidget, 200);
+    };
+
+    checkForWidget();
+  });
+}
+
+function loadInstructionsWidget() {
+  const existingScript = document.getElementById("instructions-widget-loader");
+
+  if (existingScript) {
+    return waitForInstructionWidget(0);
+  }
+
+  const previousCount = getVoiceWidgets().length;
+  const script = document.createElement("script");
+
+  script.id = "instructions-widget-loader";
+  script.src = "https://widgets.leadconnectorhq.com/loader.js";
+  script.async = true;
+  script.setAttribute("data-resources-url", "https://widgets.leadconnectorhq.com/chat-widget/loader.js");
+  script.setAttribute("data-widget-id", INSTRUCTIONS_WIDGET_ID);
+  document.body.appendChild(script);
+
+  return waitForInstructionWidget(previousCount);
+}
+
+async function openInstructionsAgent() {
+  const widget = await loadInstructionsWidget();
+  const opened = clickWidgetControl([/phone/i, /call/i, /voice/i, /chat/i, /open/i], widget);
+
+  if (!opened) {
+    widget?.shadowRoot?.querySelector<HTMLElement>(".lc_text-widget--phone-icon")?.click();
+  }
 }
 
 function widgetLooksIdle() {
@@ -356,9 +431,9 @@ function VoiceAgentDemo({
           Call{" "}
           <a className="voice-phone-link" href="tel:+18885903060">
             (888) 590-3060
-          </a>{" "}
-          or click this button.
+          </a>
         </p>
+        <p className="voice-agent-or">OR</p>
         <button
         className={"voice-agent-button " + (callActive ? "calling" : "")}
         type="button"
@@ -389,7 +464,7 @@ function VoiceAgentDemo({
             <span className="voice-call-duration">{formatCallDuration(elapsedSeconds)}</span>
           </span>
         ) : (
-          <strong>TALK TO ME</strong>
+          <strong>LET&apos;S TALK</strong>
         )}
         <span className="voice-phone-icon" aria-hidden="true">
           <Icon name="phone" />
