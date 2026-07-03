@@ -300,11 +300,45 @@ function waitForInstructionWidget(previousCount: number) {
   });
 }
 
+function sizeInstructionsWidget(widget?: HTMLElement & { shadowRoot?: ShadowRoot | null }) {
+  if (!widget) {
+    return;
+  }
+
+  widget.classList.add("instructions-chat-widget");
+
+  if (!widget.shadowRoot || widget.shadowRoot.getElementById("instructions-widget-sizing")) {
+    return;
+  }
+
+  const style = document.createElement("style");
+  style.id = "instructions-widget-sizing";
+  style.textContent = `
+    :host {
+      height: min(82vh, 620px) !important;
+      width: min(92vw, 440px) !important;
+    }
+
+    iframe,
+    [class*="container"],
+    [class*="modal"],
+    [class*="popup"],
+    [class*="widget"] {
+      max-height: min(82vh, 620px) !important;
+      max-width: min(92vw, 440px) !important;
+    }
+  `;
+  widget.shadowRoot.appendChild(style);
+}
+
 function loadInstructionsWidget() {
   const existingScript = document.getElementById("instructions-widget-loader");
 
   if (existingScript) {
-    return waitForInstructionWidget(0);
+    return waitForInstructionWidget(0).then((widget) => {
+      sizeInstructionsWidget(widget);
+      return widget;
+    });
   }
 
   const previousCount = getVoiceWidgets().length;
@@ -317,7 +351,10 @@ function loadInstructionsWidget() {
   script.setAttribute("data-widget-id", INSTRUCTIONS_WIDGET_ID);
   document.body.appendChild(script);
 
-  return waitForInstructionWidget(previousCount);
+  return waitForInstructionWidget(previousCount).then((widget) => {
+    sizeInstructionsWidget(widget);
+    return widget;
+  });
 }
 
 async function openInstructionsAgent() {
