@@ -415,7 +415,7 @@ function VoiceAgentDemo({
   const callActive = callState === "calling";
 
   return (
-    <section className="voice-agent-section" aria-labelledby="voice-agent-title">
+    <section className="voice-agent-section" id="jessica" aria-labelledby="voice-agent-title">
       <div className="voice-agent-copy">
         <h2 id="voice-agent-title">Meet Jessica,<br />Your Very Smart New<br />Receptionist</h2>
       </div>
