@@ -346,6 +346,7 @@ nav a {
   gap: 28px;
   grid-template-columns: minmax(0, 1fr) auto;
   padding: 58px 7.5%;
+  scroll-margin-top: 24px;
 }
 
 .voice-agent-copy {
