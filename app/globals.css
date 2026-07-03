@@ -2458,19 +2458,20 @@ input[type="range"]::-webkit-slider-thumb {
   align-items: center;
   animation: voiceButtonAttention 1.35s ease-in-out infinite;
   background: #fff;
-  border: 2px solid #e7373f;
+  border: 3px solid #e7373f;
   border-radius: 999px;
   color: #182522;
   cursor: pointer;
   display: inline-flex;
-  font-size: 13px;
+  font-size: 17px;
   font-weight: 900;
-  height: 30px;
+  height: 48px;
   justify-content: center;
   letter-spacing: 0;
   line-height: 1;
-  margin: 18px auto 46px;
-  padding: 0 42px;
+  margin: 20px auto 52px;
+  min-width: 230px;
+  padding: 0 58px;
   position: relative;
   transition: background-color 180ms ease, color 180ms ease, transform 180ms ease, box-shadow 180ms ease;
   z-index: 2;
@@ -2488,10 +2489,11 @@ input[type="range"]::-webkit-slider-thumb {
 
 @media (max-width: 620px) {
   .instructions-button {
-    font-size: 12px;
-    height: 28px;
-    margin: 14px auto 34px;
-    padding-inline: 34px;
+    font-size: 14px;
+    height: 42px;
+    margin: 16px auto 38px;
+    min-width: 190px;
+    padding-inline: 42px;
   }
 }
 .voice-agent-portrait {

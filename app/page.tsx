@@ -454,7 +454,7 @@ function VoiceAgentDemo({
   return (
     <section id="jessica" className="voice-agent-section" aria-labelledby="voice-agent-title">
       <div className="voice-agent-copy">
-        <h2 id="voice-agent-title">Meet Jessica,<br />Your Very Smart New<br />Receptionist</h2>
+        <h2 id="voice-agent-title">Meet Jessica,<br />Your Very Smart New<br />AI Receptionist</h2>
       </div>
 
       <img
