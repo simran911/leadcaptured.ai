@@ -2487,6 +2487,15 @@ input[type="range"]::-webkit-slider-thumb {
   transform: translateY(-2px);
 }
 
+.instructions-media {
+  height: 1px;
+  left: -9999px;
+  opacity: 0;
+  pointer-events: none;
+  position: absolute;
+  width: 1px;
+}
+
 @media (max-width: 620px) {
   .instructions-button {
     font-size: 14px;

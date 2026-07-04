@@ -52,8 +52,6 @@ type VoiceLeadResponse = {
   }) | null;
 };
 
-const INSTRUCTIONS_WIDGET_ID = "6a46a9536e972e21b6fb19eb";
-
 declare global {
   interface Window {
     prefillLeadCaptureForm?: (details: VoiceLeadDetail) => void;
@@ -88,6 +86,7 @@ function Logo({ centered = false }: { centered?: boolean }) {
 }
 
 function Calculator() {
+  const instructionsMediaRef = useRef<HTMLVideoElement>(null);
   const [missedCalls, setMissedCalls] = useState(15);
   const [jobValue, setJobValue] = useState(9000);
   const [closeRate, setCloseRate] = useState(30);
@@ -107,6 +106,17 @@ function Calculator() {
     };
   }, [closeRate, jobValue, missedCalls]);
 
+  const playInstructionsAudio = () => {
+    const media = instructionsMediaRef.current;
+
+    if (!media) {
+      return;
+    }
+
+    media.currentTime = 0;
+    void media.play();
+  };
+
   return (
     <section className="section calculator-section pattern" id="calculator">
       <div className="section-heading">
@@ -121,11 +131,20 @@ function Calculator() {
       <button
         className="instructions-button"
         type="button"
-        onClick={openInstructionsAgent}
+        onClick={playInstructionsAudio}
         aria-label="Play instructions"
       >
         INSTRUCTIONS
       </button>
+      <video
+        ref={instructionsMediaRef}
+        className="instructions-media"
+        preload="metadata"
+        playsInline
+        aria-hidden="true"
+      >
+        <source src="/audio/jessica-introduction.mp4" type="video/mp4" />
+      </video>
 
       <div className="calculator-card">
         <div className="calculator-card-heading">
@@ -239,12 +258,6 @@ function getVoiceWidget() {
     | null;
 }
 
-function getVoiceWidgets() {
-  return Array.from(document.querySelectorAll("chat-widget")) as Array<
-    HTMLElement & { shadowRoot?: ShadowRoot | null }
-  >;
-}
-
 function clickWidgetControl(patterns: RegExp[], widget = getVoiceWidget()) {
   const root = widget?.shadowRoot;
 
@@ -272,98 +285,6 @@ function clickWidgetControl(patterns: RegExp[], widget = getVoiceWidget()) {
   control?.click();
 
   return Boolean(control);
-}
-
-function waitForInstructionWidget(previousCount: number) {
-  return new Promise<HTMLElement & { shadowRoot?: ShadowRoot | null }>((resolve) => {
-    let attempts = 0;
-
-    const checkForWidget = () => {
-      attempts += 1;
-      const widgets = getVoiceWidgets();
-      const widget = widgets[widgets.length - 1];
-
-      if (widgets.length > previousCount && widget?.shadowRoot) {
-        resolve(widget);
-        return;
-      }
-
-      if (attempts >= 30) {
-        resolve(widget ?? getVoiceWidget());
-        return;
-      }
-
-      window.setTimeout(checkForWidget, 200);
-    };
-
-    checkForWidget();
-  });
-}
-
-function sizeInstructionsWidget(widget?: HTMLElement & { shadowRoot?: ShadowRoot | null }) {
-  if (!widget) {
-    return;
-  }
-
-  widget.classList.add("instructions-chat-widget");
-
-  if (!widget.shadowRoot || widget.shadowRoot.getElementById("instructions-widget-sizing")) {
-    return;
-  }
-
-  const style = document.createElement("style");
-  style.id = "instructions-widget-sizing";
-  style.textContent = `
-    :host {
-      height: min(82vh, 620px) !important;
-      width: min(92vw, 440px) !important;
-    }
-
-    iframe,
-    [class*="container"],
-    [class*="modal"],
-    [class*="popup"],
-    [class*="widget"] {
-      max-height: min(82vh, 620px) !important;
-      max-width: min(92vw, 440px) !important;
-    }
-  `;
-  widget.shadowRoot.appendChild(style);
-}
-
-function loadInstructionsWidget() {
-  const existingScript = document.getElementById("instructions-widget-loader");
-
-  if (existingScript) {
-    return waitForInstructionWidget(0).then((widget) => {
-      sizeInstructionsWidget(widget);
-      return widget;
-    });
-  }
-
-  const previousCount = getVoiceWidgets().length;
-  const script = document.createElement("script");
-
-  script.id = "instructions-widget-loader";
-  script.src = "https://widgets.leadconnectorhq.com/loader.js";
-  script.async = true;
-  script.setAttribute("data-resources-url", "https://widgets.leadconnectorhq.com/chat-widget/loader.js");
-  script.setAttribute("data-widget-id", INSTRUCTIONS_WIDGET_ID);
-  document.body.appendChild(script);
-
-  return waitForInstructionWidget(previousCount).then((widget) => {
-    sizeInstructionsWidget(widget);
-    return widget;
-  });
-}
-
-async function openInstructionsAgent() {
-  const widget = await loadInstructionsWidget();
-  const opened = clickWidgetControl([/phone/i, /call/i, /voice/i, /chat/i, /open/i], widget);
-
-  if (!opened) {
-    widget?.shadowRoot?.querySelector<HTMLElement>(".lc_text-widget--phone-icon")?.click();
-  }
 }
 
 function widgetLooksIdle() {
