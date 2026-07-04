@@ -87,6 +87,7 @@ function Logo({ centered = false }: { centered?: boolean }) {
 
 function Calculator() {
   const instructionsMediaRef = useRef<HTMLVideoElement>(null);
+  const [instructionsPlaying, setInstructionsPlaying] = useState(false);
   const [missedCalls, setMissedCalls] = useState(15);
   const [jobValue, setJobValue] = useState(9000);
   const [closeRate, setCloseRate] = useState(30);
@@ -106,15 +107,22 @@ function Calculator() {
     };
   }, [closeRate, jobValue, missedCalls]);
 
-  const playInstructionsAudio = () => {
+  const toggleInstructionsAudio = () => {
     const media = instructionsMediaRef.current;
 
     if (!media) {
       return;
     }
 
+    if (!media.paused && !media.ended) {
+      media.pause();
+      media.currentTime = 0;
+      setInstructionsPlaying(false);
+      return;
+    }
+
     media.currentTime = 0;
-    void media.play();
+    void media.play().then(() => setInstructionsPlaying(true)).catch(() => setInstructionsPlaying(false));
   };
 
   return (
@@ -131,8 +139,9 @@ function Calculator() {
       <button
         className="instructions-button"
         type="button"
-        onClick={playInstructionsAudio}
+        onClick={toggleInstructionsAudio}
         aria-label="Play instructions"
+        aria-pressed={instructionsPlaying}
       >
         INSTRUCTIONS
       </button>
@@ -142,6 +151,9 @@ function Calculator() {
         preload="metadata"
         playsInline
         aria-hidden="true"
+        onEnded={() => setInstructionsPlaying(false)}
+        onPause={() => setInstructionsPlaying(false)}
+        onPlay={() => setInstructionsPlaying(true)}
       >
         <source src="/audio/jessica-introduction.mp4" type="video/mp4" />
       </video>
