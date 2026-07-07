@@ -9,6 +9,9 @@ export default function TermsAndConditionsPage() {
   return (
     <main className="legal-page">
       <section className="legal-card">
+        <a className="legal-back" href="/">
+          Back to Home
+        </a>
         <a className="legal-logo" href="/">
           LeadCaptured<span>.ai</span>
         </a>
