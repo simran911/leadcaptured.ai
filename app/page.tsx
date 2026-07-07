@@ -652,6 +652,10 @@ export default function Home() {
           <span aria-hidden="true">|</span>
           <a href="/terms-and-conditions">Terms &amp; Conditions</a>
         </nav>
+        <div className="footer-contact" aria-label="Contact information">
+          <a href="mailto:wayne@salesengines.ai">wayne@salesengines.ai</a>
+          <a href="tel:+14156866966">(415) 686-6966</a>
+        </div>
         <p>© 2026 LeadCaptured.ai. All rights reserved.</p>
       </footer>
     </main>

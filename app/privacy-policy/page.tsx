@@ -28,8 +28,8 @@ export default function PrivacyPolicyPage() {
           purposes.
         </p>
         <p>
-          SMS opt-in and phone numbers collected for SMS communications are not shared with any
-          third parties or affiliates for marketing purposes.
+          SMS opt-in and phone numbers collected for SMS communications are not shared with third
+          parties or affiliates for marketing purposes.
         </p>
 
         <h2>Information We Collect</h2>
