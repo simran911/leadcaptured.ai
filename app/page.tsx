@@ -647,6 +647,11 @@ export default function Home() {
 
       <footer className="footer">
         <Logo centered />
+        <nav className="footer-links" aria-label="Legal links">
+          <a href="/privacy-policy">Privacy Policy</a>
+          <span aria-hidden="true">|</span>
+          <a href="/terms-and-conditions">Terms &amp; Conditions</a>
+        </nav>
         <p>© 2026 LeadCaptured.ai. All rights reserved.</p>
       </footer>
     </main>
