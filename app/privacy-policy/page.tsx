@@ -10,7 +10,8 @@ export default function PrivacyPolicyPage() {
     <main className="legal-page">
       <section className="legal-card">
         <a className="legal-back" href="/">
-          Back to Home
+          <span aria-hidden="true">←</span>
+          <span className="sr-only">Back to home</span>
         </a>
         <a className="legal-logo" href="/">
           LeadCaptured<span>.ai</span>
