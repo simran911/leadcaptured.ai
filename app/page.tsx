@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { trackFeatureEngagement } from "../components/analytics/analytics-events";
 
 const faqs = [
   {
@@ -87,6 +88,7 @@ function Logo({ centered = false }: { centered?: boolean }) {
 
 function Calculator() {
   const instructionsMediaRef = useRef<HTMLVideoElement>(null);
+  const calculatorTrackedRef = useRef(false);
   const [instructionsPlaying, setInstructionsPlaying] = useState(false);
   const [missedCalls, setMissedCalls] = useState(15);
   const [jobValue, setJobValue] = useState(9000);
@@ -123,6 +125,15 @@ function Calculator() {
 
     media.currentTime = 0;
     void media.play().then(() => setInstructionsPlaying(true)).catch(() => setInstructionsPlaying(false));
+  };
+
+  const trackCalculatorUse = () => {
+    if (calculatorTrackedRef.current) {
+      return;
+    }
+
+    calculatorTrackedRef.current = true;
+    trackFeatureEngagement("calculator", "slider_changed");
   };
 
   return (
@@ -172,7 +183,10 @@ function Calculator() {
           max={100}
           step={1}
           display={String(missedCalls)}
-          onChange={setMissedCalls}
+          onChange={(value) => {
+            trackCalculatorUse();
+            setMissedCalls(value);
+          }}
         />
         <Slider
           label="Average Job Value"
@@ -181,7 +195,10 @@ function Calculator() {
           max={25000}
           step={500}
           display={currency(jobValue)}
-          onChange={setJobValue}
+          onChange={(value) => {
+            trackCalculatorUse();
+            setJobValue(value);
+          }}
         />
         <Slider
           label="Close Rate"
@@ -190,7 +207,10 @@ function Calculator() {
           max={80}
           step={1}
           display={String(closeRate) + "%"}
-          onChange={setCloseRate}
+          onChange={(value) => {
+            trackCalculatorUse();
+            setCloseRate(value);
+          }}
         />
 
         <div className="calc-divider" />
@@ -338,6 +358,7 @@ function VoiceAgentDemo({
     startedAtRef.current = Date.now();
     setElapsedSeconds(0);
     setCallState("calling");
+    trackFeatureEngagement("ai_receptionist", "call_started");
     onVoiceStarted();
 
     const opened = clickWidgetControl([/phone/i, /call/i, /voice/i]);
@@ -458,6 +479,7 @@ export default function Home() {
     employees: "",
   });
   const [appointmentAccepted, setAppointmentAccepted] = useState(false);
+  const calendarTrackedRef = useRef(false);
 
   const prefillLeadForm = (details: VoiceLeadDetail) => {
     setLeadForm((current) => ({
@@ -554,6 +576,32 @@ export default function Home() {
       stopped = true;
     };
   }, [sessionId, voiceStartedAt]);
+
+  useEffect(() => {
+    const calendarSection = document.getElementById("trial");
+
+    if (!calendarSection) {
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting || calendarTrackedRef.current) {
+          return;
+        }
+
+        calendarTrackedRef.current = true;
+        trackFeatureEngagement("calendar", "section_viewed");
+      },
+      {
+        threshold: 0.35,
+      },
+    );
+
+    observer.observe(calendarSection);
+
+    return () => observer.disconnect();
+  }, []);
 
   const updateLeadField =
     (field: keyof LeadForm) => (event: React.ChangeEvent<HTMLInputElement>) => {

@@ -3,9 +3,14 @@ export type AnalyticsEventName =
   | "page_view"
   | "heartbeat"
   | "session_ended"
+  | "feature_engaged"
   | "chat_started"
   | "appointment_booked"
   | "form_submitted";
+
+export type AnalyticsFeatureName = "calculator" | "ai_receptionist" | "calendar";
+
+export type FeatureUsage = Record<AnalyticsFeatureName, boolean>;
 
 export type TrafficSource =
   | "direct"
@@ -51,6 +56,7 @@ export type AnalyticsSession = {
   lastActivityAt: number;
   endedAt: number | null;
   leadId: string | null;
+  featureUsage: FeatureUsage;
 };
 
 export type AnalyticsEvent = {
@@ -75,6 +81,12 @@ export type AnalyticsMetrics = {
   pageViewsToday: number;
   averageSessionDurationSeconds: number;
   bounceRate: number;
+};
+
+export type FeatureMetric = {
+  feature: AnalyticsFeatureName;
+  label: string;
+  users: number;
 };
 
 export type RegionMetric = VisitorLocation & {
@@ -103,6 +115,7 @@ export type AnalyticsSnapshot = {
   activityFeed: AnalyticsEvent[];
   mostVisitedPages: PageMetric[];
   trafficSources: SourceMetric[];
+  featureEngagement: FeatureMetric[];
   recentVisitors: AnalyticsSession[];
   visitorsPerMinute: TimelinePoint[];
   sessionsPerHour: TimelinePoint[];

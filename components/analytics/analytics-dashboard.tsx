@@ -26,6 +26,7 @@ const emptySnapshot: AnalyticsSnapshot = {
   activityFeed: [],
   mostVisitedPages: [],
   trafficSources: [],
+  featureEngagement: [],
   recentVisitors: [],
   visitorsPerMinute: [],
   sessionsPerHour: [],
@@ -188,6 +189,9 @@ function ActiveUsersTable({ users }: { users: AnalyticsSession[] }) {
             <th>Device</th>
             <th>Browser</th>
             <th>Operating System</th>
+            <th>Calculator Used</th>
+            <th>AI Receptionist Used</th>
+            <th>Calendar Used</th>
             <th>Time on Site</th>
             <th>First Seen</th>
             <th>Last Activity</th>
@@ -209,6 +213,15 @@ function ActiveUsersTable({ users }: { users: AnalyticsSession[] }) {
                 <td>{user.device.device}</td>
                 <td>{user.device.browser}</td>
                 <td>{user.device.os}</td>
+                <td>
+                  <UsageBadge used={Boolean(user.featureUsage?.calculator)} />
+                </td>
+                <td>
+                  <UsageBadge used={Boolean(user.featureUsage?.ai_receptionist)} />
+                </td>
+                <td>
+                  <UsageBadge used={Boolean(user.featureUsage?.calendar)} />
+                </td>
                 <td>{formatDuration(Math.round((Date.now() - user.startedAt) / 1000))}</td>
                 <td>{formatTime(user.firstSeenAt)}</td>
                 <td>{formatTime(user.lastActivityAt)}</td>
@@ -216,7 +229,7 @@ function ActiveUsersTable({ users }: { users: AnalyticsSession[] }) {
             ))
           ) : (
             <tr>
-              <td colSpan={11} className={styles.emptyCell}>
+              <td colSpan={14} className={styles.emptyCell}>
                 Waiting for live visitors.
               </td>
             </tr>
@@ -225,6 +238,10 @@ function ActiveUsersTable({ users }: { users: AnalyticsSession[] }) {
       </table>
     </div>
   );
+}
+
+function UsageBadge({ used }: { used: boolean }) {
+  return <span className={used ? styles.usedBadge : styles.notUsedBadge}>{used ? "Yes" : "No"}</span>;
 }
 
 function RegionList({ regions }: { regions: AnalyticsSnapshot["topRegions"] }) {

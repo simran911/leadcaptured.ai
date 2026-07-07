@@ -1,6 +1,7 @@
 import type {
   AnalyticsEvent,
   AnalyticsEventName,
+  AnalyticsFeatureName,
   AnalyticsSession,
   AnalyticsSnapshot,
   SourceMetric,
@@ -46,6 +47,12 @@ const futureSources: TrafficSource[] = [
   "whatsapp",
 ];
 
+const trackedFeatures: Array<{ feature: AnalyticsFeatureName; label: string }> = [
+  { feature: "calculator", label: "Calculator" },
+  { feature: "ai_receptionist", label: "AI Receptionist" },
+  { feature: "calendar", label: "Schedule Q&A / Setup Zoom" },
+];
+
 const globalState = globalThis as typeof globalThis & {
   __leadCapturedAnalyticsStore?: AnalyticsStoreState;
 };
@@ -84,6 +91,7 @@ export function recordAnalyticsEvent(payload: AnalyticsPayload, request: Request
   const location = inferLocation(request, payload);
   const device = parseDevice(request.headers.get("user-agent") || "");
   const trafficSource = inferTrafficSource(referrer);
+  const featureUsage = getNextFeatureUsage(existingSession?.featureUsage, payload);
 
   const session: AnalyticsSession = {
     visitorId,
@@ -101,6 +109,7 @@ export function recordAnalyticsEvent(payload: AnalyticsPayload, request: Request
     lastActivityAt: now,
     endedAt: eventName === "session_ended" ? now : null,
     leadId: payload.leadId ?? existingSession?.leadId ?? null,
+    featureUsage,
   };
 
   state.sessions.set(sessionId, session);
@@ -130,6 +139,29 @@ export function recordAnalyticsEvent(payload: AnalyticsPayload, request: Request
   broadcastSnapshot();
 
   return event;
+}
+
+function getNextFeatureUsage(current: AnalyticsSession["featureUsage"] | undefined, payload: AnalyticsPayload) {
+  const next = current || {
+    calculator: false,
+    ai_receptionist: false,
+    calendar: false,
+  };
+
+  if (payload.event !== "feature_engaged") {
+    return next;
+  }
+
+  const feature = payload.metadata?.feature;
+
+  if (feature === "calculator" || feature === "ai_receptionist" || feature === "calendar") {
+    return {
+      ...next,
+      [feature]: true,
+    };
+  }
+
+  return next;
 }
 
 export function getAnalyticsSnapshot(): AnalyticsSnapshot {
@@ -166,12 +198,29 @@ export function getAnalyticsSnapshot(): AnalyticsSnapshot {
     activityFeed: state.events.slice(0, 40),
     mostVisitedPages: getPageMetrics(todayEvents),
     trafficSources: getTrafficSources(todaySessions),
+    featureEngagement: getFeatureEngagement(todayEvents),
     recentVisitors: todaySessions.sort((a, b) => b.firstSeenAt - a.firstSeenAt).slice(0, 40),
     visitorsPerMinute: buildMinuteTimeline(todayEvents),
     sessionsPerHour: buildHourlyTimeline(todaySessions),
     pageViewsTimeline: buildPageViewsTimeline(todayEvents),
     generatedAt: now,
   };
+}
+
+function getFeatureEngagement(events: AnalyticsEvent[]) {
+  return trackedFeatures.map(({ feature, label }) => {
+    const users = new Set(
+      events
+        .filter((event) => event.name === "feature_engaged" && event.metadata.feature === feature)
+        .map((event) => event.visitorId),
+    );
+
+    return {
+      feature,
+      label,
+      users: users.size,
+    };
+  });
 }
 
 function broadcastSnapshot() {

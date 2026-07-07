@@ -230,6 +230,27 @@
   width: 8px;
 }
 
+.usedBadge,
+.notUsedBadge {
+  border-radius: 999px;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  justify-content: center;
+  min-width: 42px;
+  padding: 5px 9px;
+}
+
+.usedBadge {
+  background: #dcfce7;
+  color: #15803d;
+}
+
+.notUsedBadge {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
 .emptyCell,
 .emptyState,
 .mapEmpty {
