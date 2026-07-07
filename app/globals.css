@@ -1257,9 +1257,25 @@ input[type="range"]::-webkit-slider-thumb {
   margin: 0;
 }
 
+.legal-card p + p,
+.legal-card ul + p,
+.legal-card p + ul {
+  margin-top: 10px;
+}
+
+.legal-card li + li {
+  margin-top: 4px;
+}
+
 .legal-card ul {
   margin: 0;
   padding-left: 22px;
+}
+
+.legal-card p a {
+  color: #10211f;
+  font-weight: 800;
+  text-decoration: underline;
 }
 
 @media (max-width: 1120px) {
