@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Script from "next/script";
+import { AnalyticsTracker } from "../components/analytics/analytics-tracker";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,6 +17,7 @@ export default function RootLayout({
     <html lang="en">
       <body>
         {children}
+        <AnalyticsTracker />
         <Script
           src="https://www.googletagmanager.com/gtag/js?id=G-HZ4Z2ZMJ6Y"
           strategy="afterInteractive"
