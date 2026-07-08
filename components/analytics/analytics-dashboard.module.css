@@ -44,7 +44,8 @@
 .liveStatus,
 .timestamp,
 .iconButton,
-.secondaryButton {
+.secondaryButton,
+.datePicker {
   align-items: center;
   background: #fff;
   border: 1px solid #e2e8f0;
@@ -57,6 +58,21 @@
   gap: 8px;
   min-height: 38px;
   padding: 0 12px;
+}
+
+.datePicker {
+  color: #64748b;
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.datePicker input {
+  border: 0;
+  color: #334155;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 900;
+  outline: 0;
 }
 
 .iconButton,
@@ -225,6 +241,22 @@
 
 .activePill span {
   background: #22c55e;
+  border-radius: 50%;
+  height: 8px;
+  width: 8px;
+}
+
+.endedPill {
+  align-items: center;
+  color: #64748b;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 6px;
+}
+
+.endedPill span {
+  background: #94a3b8;
   border-radius: 50%;
   height: 8px;
   width: 8px;

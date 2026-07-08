@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Invalid JSON payload" }, { status: 400 });
   }
 
-  const event = recordAnalyticsEvent(
+  const event = await recordAnalyticsEvent(
     typeof payload === "object" && payload !== null
       ? (payload as {
           visitorId?: string;

@@ -10,5 +10,5 @@ export default async function AdminAnalyticsPage() {
     redirect("/admin/analytics/login");
   }
 
-  return <AnalyticsDashboard initialSnapshot={getAnalyticsSnapshot()} />;
+  return <AnalyticsDashboard initialSnapshot={await getAnalyticsSnapshot()} />;
 }

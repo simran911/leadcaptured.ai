@@ -4,11 +4,20 @@ import type {
   AnalyticsFeatureName,
   AnalyticsSession,
   AnalyticsSnapshot,
+  FeatureUsage,
   SourceMetric,
   TrafficSource,
   VisitorDevice,
   VisitorLocation,
 } from "./analytics-types";
+
+type PgPool = {
+  query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
+};
+
+const { Pool } = require("pg") as {
+  Pool: new (config: Record<string, unknown>) => PgPool;
+};
 
 type AnalyticsPayload = {
   visitorId?: string;
@@ -24,10 +33,51 @@ type AnalyticsPayload = {
   metadata?: Record<string, string | number | boolean | null>;
 };
 
+type DateRange = {
+  startMs: number;
+  endMs: number;
+  selectedDate: string;
+};
+
 type AnalyticsStoreState = {
   sessions: Map<string, AnalyticsSession>;
   events: AnalyticsEvent[];
   subscribers: Set<(snapshot: AnalyticsSnapshot) => void>;
+  pool?: PgPool;
+  schemaReady?: Promise<void>;
+};
+
+type SessionRow = {
+  visitor_id: string;
+  session_id: string;
+  ip_address: string;
+  location: VisitorLocation;
+  device: VisitorDevice;
+  referrer: string;
+  traffic_source: TrafficSource;
+  landing_page: string;
+  current_page: string;
+  page_views: number;
+  started_at_ms: string | number;
+  first_seen_at_ms: string | number;
+  last_activity_at_ms: string | number;
+  ended_at_ms: string | number | null;
+  lead_id: string | null;
+  feature_usage: FeatureUsage;
+};
+
+type EventRow = {
+  id: string;
+  name: AnalyticsEventName;
+  visitor_id: string;
+  session_id: string;
+  page: string;
+  path: string;
+  title: string;
+  referrer: string;
+  traffic_source: TrafficSource;
+  occurred_at_ms: string | number;
+  metadata: Record<string, string | number | boolean | null>;
 };
 
 const ACTIVE_WINDOW_MS = 45_000;
@@ -69,6 +119,80 @@ function getState() {
   return globalState.__leadCapturedAnalyticsStore;
 }
 
+function getPool() {
+  const state = getState();
+
+  if (!process.env.DATABASE_URL) {
+    return null;
+  }
+
+  if (!state.pool) {
+    state.pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 5,
+      ssl: { rejectUnauthorized: false },
+    });
+  }
+
+  return state.pool;
+}
+
+async function ensureSchema() {
+  const state = getState();
+  const pool = getPool();
+
+  if (!pool) {
+    return;
+  }
+
+  if (!state.schemaReady) {
+    state.schemaReady = pool.query(`
+      create table if not exists public.analytics_sessions (
+        session_id text primary key,
+        visitor_id text not null,
+        ip_address text not null default 'Unknown',
+        location jsonb not null default '{}'::jsonb,
+        device jsonb not null default '{}'::jsonb,
+        referrer text not null default 'Direct',
+        traffic_source text not null default 'direct',
+        landing_page text not null default 'Home',
+        current_page text not null default 'Home',
+        page_views integer not null default 0,
+        started_at_ms bigint not null,
+        first_seen_at_ms bigint not null,
+        last_activity_at_ms bigint not null,
+        ended_at_ms bigint,
+        lead_id text,
+        feature_usage jsonb not null default '{"calculator":false,"ai_receptionist":false,"calendar":false}'::jsonb,
+        created_at timestamptz not null default now(),
+        updated_at timestamptz not null default now()
+      );
+
+      create table if not exists public.analytics_events (
+        id text primary key,
+        name text not null,
+        visitor_id text not null,
+        session_id text not null references public.analytics_sessions(session_id) on delete cascade,
+        page text not null,
+        path text not null,
+        title text not null,
+        referrer text not null default 'Direct',
+        traffic_source text not null default 'direct',
+        occurred_at_ms bigint not null,
+        metadata jsonb not null default '{}'::jsonb,
+        created_at timestamptz not null default now()
+      );
+
+      create index if not exists analytics_sessions_started_at_ms_idx on public.analytics_sessions(started_at_ms desc);
+      create index if not exists analytics_sessions_last_activity_at_ms_idx on public.analytics_sessions(last_activity_at_ms desc);
+      create index if not exists analytics_events_occurred_at_ms_idx on public.analytics_events(occurred_at_ms desc);
+      create index if not exists analytics_events_session_id_idx on public.analytics_events(session_id);
+    `).then(() => undefined);
+  }
+
+  await state.schemaReady;
+}
+
 export function subscribeToAnalytics(listener: (snapshot: AnalyticsSnapshot) => void) {
   const state = getState();
   state.subscribers.add(listener);
@@ -76,8 +200,26 @@ export function subscribeToAnalytics(listener: (snapshot: AnalyticsSnapshot) => 
   return () => state.subscribers.delete(listener);
 }
 
-export function recordAnalyticsEvent(payload: AnalyticsPayload, request: Request) {
-  const state = getState();
+export async function recordAnalyticsEvent(payload: AnalyticsPayload, request: Request) {
+  await ensureSchema();
+
+  const pool = getPool();
+  const event = await buildAnalyticsEvent(payload, request);
+
+  if (pool) {
+    await persistAnalyticsEvent(pool, event);
+  } else {
+    persistInMemory(event);
+  }
+
+  pruneInactiveSessions();
+  broadcastSnapshot();
+
+  return event;
+}
+
+async function buildAnalyticsEvent(payload: AnalyticsPayload, request: Request) {
+  const existingSession = await getExistingSession(sanitize(payload.sessionId));
   const now = Date.now();
   const visitorId = sanitize(payload.visitorId) || createId("visitor");
   const sessionId = sanitize(payload.sessionId) || createId("session");
@@ -85,7 +227,6 @@ export function recordAnalyticsEvent(payload: AnalyticsPayload, request: Request
   const path = normalizePath(payload.path || "/");
   const page = sanitize(payload.page) || humanizePath(path);
   const referrer = sanitize(payload.referrer);
-  const existingSession = state.sessions.get(sessionId);
   const startedAt = existingSession?.startedAt || now;
   const pageViews = existingSession?.pageViews || 0;
   const location = inferLocation(request, payload);
@@ -112,9 +253,7 @@ export function recordAnalyticsEvent(payload: AnalyticsPayload, request: Request
     featureUsage,
   };
 
-  state.sessions.set(sessionId, session);
-
-  const event: AnalyticsEvent = {
+  return {
     id: createId("event"),
     name: eventName,
     visitorId,
@@ -127,21 +266,130 @@ export function recordAnalyticsEvent(payload: AnalyticsPayload, request: Request
     occurredAt: now,
     metadata: payload.metadata || {},
     session,
-  };
+  } satisfies AnalyticsEvent;
+}
 
+async function getExistingSession(sessionId: string) {
+  if (!sessionId) {
+    return null;
+  }
+
+  const pool = getPool();
+
+  if (!pool) {
+    return getState().sessions.get(sessionId) || null;
+  }
+
+  const result = await pool.query<SessionRow>(
+    "select * from public.analytics_sessions where session_id = $1 limit 1",
+    [sessionId],
+  );
+
+  return result.rows[0] ? mapSessionRow(result.rows[0]) : null;
+}
+
+async function persistAnalyticsEvent(pool: PgPool, event: AnalyticsEvent) {
+  await pool.query(
+    `
+      insert into public.analytics_sessions (
+        session_id,
+        visitor_id,
+        ip_address,
+        location,
+        device,
+        referrer,
+        traffic_source,
+        landing_page,
+        current_page,
+        page_views,
+        started_at_ms,
+        first_seen_at_ms,
+        last_activity_at_ms,
+        ended_at_ms,
+        lead_id,
+        feature_usage,
+        updated_at
+      )
+      values ($1, $2, $3, $4::jsonb, $5::jsonb, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16::jsonb, now())
+      on conflict (session_id) do update set
+        visitor_id = excluded.visitor_id,
+        ip_address = excluded.ip_address,
+        location = excluded.location,
+        device = excluded.device,
+        referrer = excluded.referrer,
+        traffic_source = excluded.traffic_source,
+        current_page = excluded.current_page,
+        page_views = excluded.page_views,
+        last_activity_at_ms = excluded.last_activity_at_ms,
+        ended_at_ms = excluded.ended_at_ms,
+        lead_id = excluded.lead_id,
+        feature_usage = excluded.feature_usage,
+        updated_at = now()
+    `,
+    [
+      event.session.sessionId,
+      event.session.visitorId,
+      event.session.ipAddress,
+      JSON.stringify(event.session.location),
+      JSON.stringify(event.session.device),
+      event.session.referrer,
+      event.session.trafficSource,
+      event.session.landingPage,
+      event.session.currentPage,
+      event.session.pageViews,
+      event.session.startedAt,
+      event.session.firstSeenAt,
+      event.session.lastActivityAt,
+      event.session.endedAt,
+      event.session.leadId,
+      JSON.stringify(event.session.featureUsage),
+    ],
+  );
+
+  await pool.query(
+    `
+      insert into public.analytics_events (
+        id,
+        name,
+        visitor_id,
+        session_id,
+        page,
+        path,
+        title,
+        referrer,
+        traffic_source,
+        occurred_at_ms,
+        metadata
+      )
+      values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb)
+    `,
+    [
+      event.id,
+      event.name,
+      event.visitorId,
+      event.sessionId,
+      event.page,
+      event.path,
+      event.title,
+      event.referrer,
+      event.trafficSource,
+      event.occurredAt,
+      JSON.stringify(event.metadata),
+    ],
+  );
+}
+
+function persistInMemory(event: AnalyticsEvent) {
+  const state = getState();
+  state.sessions.set(event.sessionId, event.session);
   state.events.unshift(event);
 
   if (state.events.length > MAX_EVENTS) {
     state.events.length = MAX_EVENTS;
   }
-
-  pruneInactiveSessions(state, now);
-  broadcastSnapshot();
-
-  return event;
 }
 
-function getNextFeatureUsage(current: AnalyticsSession["featureUsage"] | undefined, payload: AnalyticsPayload) {
+function getNextFeatureUsage(current: FeatureUsage | undefined, payload: AnalyticsPayload) {
   const next = current || {
     calculator: false,
     ai_receptionist: false,
@@ -164,46 +412,155 @@ function getNextFeatureUsage(current: AnalyticsSession["featureUsage"] | undefin
   return next;
 }
 
-export function getAnalyticsSnapshot(): AnalyticsSnapshot {
+export async function getAnalyticsSnapshot(date?: string): Promise<AnalyticsSnapshot> {
+  await ensureSchema();
+
+  const pool = getPool();
+  const range = getDateRange(date);
+
+  if (!pool) {
+    return buildSnapshotFromMemory(range);
+  }
+
+  const sessionsResult = await pool.query<SessionRow>(
+    `
+      select *
+      from public.analytics_sessions
+      where started_at_ms >= $1 and started_at_ms < $2
+      order by last_activity_at_ms desc
+    `,
+    [range.startMs, range.endMs],
+  );
+  const eventsResult = await pool.query<EventRow>(
+    `
+      select *
+      from public.analytics_events
+      where occurred_at_ms >= $1 and occurred_at_ms < $2
+      order by occurred_at_ms desc
+      limit 1200
+    `,
+    [range.startMs, range.endMs],
+  );
+  const sessions = sessionsResult.rows.map(mapSessionRow);
+  const events = mapEventRows(eventsResult.rows, sessions);
+
+  return buildSnapshot(sessions, events, range);
+}
+
+function buildSnapshotFromMemory(range: DateRange) {
   const state = getState();
+  const sessions = Array.from(state.sessions.values()).filter(
+    (session) => session.startedAt >= range.startMs && session.startedAt < range.endMs,
+  );
+  const events = state.events.filter(
+    (event) => event.occurredAt >= range.startMs && event.occurredAt < range.endMs,
+  );
+
+  return buildSnapshot(sessions, events, range);
+}
+
+function buildSnapshot(sessions: AnalyticsSession[], events: AnalyticsEvent[], range: DateRange) {
   const now = Date.now();
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayStartMs = todayStart.getTime();
-  const sessions = Array.from(state.sessions.values());
-  const todaySessions = sessions.filter((session) => session.startedAt >= todayStartMs);
+  const isToday = range.selectedDate === getDateRange().selectedDate;
   const activeUsers = sessions
-    .filter((session) => isActive(session, now))
+    .filter((session) => (isToday ? isActive(session, now) : true))
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt);
-  const todayEvents = state.events.filter((event) => event.occurredAt >= todayStartMs);
-  const pageViewsToday = todayEvents.filter((event) => event.name === "page_view" || event.name === "session_started").length;
-  const uniqueVisitors = new Set(todaySessions.map((session) => session.visitorId));
-  const bouncedSessions = todaySessions.filter((session) => session.pageViews <= 1).length;
-  const totalDuration = todaySessions.reduce((sum, session) => {
+  const pageViewsToday = events.filter((event) => event.name === "page_view" || event.name === "session_started").length;
+  const uniqueVisitors = new Set(sessions.map((session) => session.visitorId));
+  const bouncedSessions = sessions.filter((session) => session.pageViews <= 1).length;
+  const totalDuration = sessions.reduce((sum, session) => {
     const end = session.endedAt || session.lastActivityAt || now;
     return sum + Math.max(0, end - session.startedAt);
   }, 0);
 
   return {
     metrics: {
-      activeVisitors: activeUsers.length,
+      activeVisitors: sessions.filter((session) => isActive(session, now)).length,
       visitorsToday: uniqueVisitors.size,
-      totalSessionsToday: todaySessions.length,
+      totalSessionsToday: sessions.length,
       pageViewsToday,
-      averageSessionDurationSeconds: todaySessions.length ? Math.round(totalDuration / todaySessions.length / 1000) : 0,
-      bounceRate: todaySessions.length ? Math.round((bouncedSessions / todaySessions.length) * 100) : 0,
+      averageSessionDurationSeconds: sessions.length ? Math.round(totalDuration / sessions.length / 1000) : 0,
+      bounceRate: sessions.length ? Math.round((bouncedSessions / sessions.length) * 100) : 0,
     },
     activeUsers,
-    topRegions: getTopRegions(todaySessions),
-    activityFeed: state.events.slice(0, 40),
-    mostVisitedPages: getPageMetrics(todayEvents),
-    trafficSources: getTrafficSources(todaySessions),
-    featureEngagement: getFeatureEngagement(todayEvents),
-    recentVisitors: todaySessions.sort((a, b) => b.firstSeenAt - a.firstSeenAt).slice(0, 40),
-    visitorsPerMinute: buildMinuteTimeline(todayEvents),
-    sessionsPerHour: buildHourlyTimeline(todaySessions),
-    pageViewsTimeline: buildPageViewsTimeline(todayEvents),
+    topRegions: getTopRegions(sessions),
+    activityFeed: events.slice(0, 40),
+    mostVisitedPages: getPageMetrics(events),
+    trafficSources: getTrafficSources(sessions),
+    featureEngagement: getFeatureEngagement(events),
+    recentVisitors: sessions.sort((a, b) => b.firstSeenAt - a.firstSeenAt).slice(0, 40),
+    visitorsPerMinute: buildMinuteTimeline(events, range),
+    sessionsPerHour: buildHourlyTimeline(sessions, range),
+    pageViewsTimeline: buildPageViewsTimeline(events, range),
     generatedAt: now,
+    selectedDate: range.selectedDate,
+  };
+}
+
+function mapSessionRow(row: SessionRow): AnalyticsSession {
+  return {
+    visitorId: row.visitor_id,
+    sessionId: row.session_id,
+    ipAddress: row.ip_address,
+    location: row.location || unknownLocation(),
+    device: row.device || unknownDevice(),
+    referrer: row.referrer,
+    trafficSource: row.traffic_source,
+    landingPage: row.landing_page,
+    currentPage: row.current_page,
+    pageViews: Number(row.page_views || 0),
+    startedAt: Number(row.started_at_ms),
+    firstSeenAt: Number(row.first_seen_at_ms),
+    lastActivityAt: Number(row.last_activity_at_ms),
+    endedAt: row.ended_at_ms === null ? null : Number(row.ended_at_ms),
+    leadId: row.lead_id,
+    featureUsage: row.feature_usage || defaultFeatureUsage(),
+  };
+}
+
+function mapEventRows(rows: EventRow[], sessions: AnalyticsSession[]) {
+  const sessionMap = new Map(sessions.map((session) => [session.sessionId, session]));
+
+  return rows.map((row) => {
+    const fallbackSession = sessionMap.get(row.session_id) || createFallbackSession(row);
+
+    return {
+      id: row.id,
+      name: row.name,
+      visitorId: row.visitor_id,
+      sessionId: row.session_id,
+      page: row.page,
+      path: row.path,
+      title: row.title,
+      referrer: row.referrer,
+      trafficSource: row.traffic_source,
+      occurredAt: Number(row.occurred_at_ms),
+      metadata: row.metadata || {},
+      session: fallbackSession,
+    } satisfies AnalyticsEvent;
+  });
+}
+
+function createFallbackSession(row: EventRow): AnalyticsSession {
+  const occurredAt = Number(row.occurred_at_ms);
+
+  return {
+    visitorId: row.visitor_id,
+    sessionId: row.session_id,
+    ipAddress: "Unknown",
+    location: unknownLocation(),
+    device: unknownDevice(),
+    referrer: row.referrer,
+    trafficSource: row.traffic_source,
+    landingPage: row.page,
+    currentPage: row.page,
+    pageViews: 0,
+    startedAt: occurredAt,
+    firstSeenAt: occurredAt,
+    lastActivityAt: occurredAt,
+    endedAt: null,
+    leadId: null,
+    featureUsage: defaultFeatureUsage(),
   };
 }
 
@@ -225,14 +582,29 @@ function getFeatureEngagement(events: AnalyticsEvent[]) {
 
 function broadcastSnapshot() {
   const state = getState();
-  const snapshot = getAnalyticsSnapshot();
 
-  for (const subscriber of state.subscribers) {
-    subscriber(snapshot);
-  }
+  void getAnalyticsSnapshot().then((snapshot) => {
+    for (const subscriber of state.subscribers) {
+      subscriber(snapshot);
+    }
+  });
 }
 
-function pruneInactiveSessions(state: AnalyticsStoreState, now: number) {
+function pruneInactiveSessions() {
+  const pool = getPool();
+  const now = Date.now();
+  const cutoff = now - 1000 * 60 * 60 * 8;
+
+  if (pool) {
+    void pool.query(
+      "update public.analytics_sessions set ended_at_ms = last_activity_at_ms, updated_at = now() where ended_at_ms is null and last_activity_at_ms < $1",
+      [cutoff],
+    );
+    return;
+  }
+
+  const state = getState();
+
   for (const [sessionId, session] of state.sessions) {
     if (!session.endedAt && now - session.lastActivityAt > 1000 * 60 * 60 * 8) {
       state.sessions.set(sessionId, {
@@ -310,12 +682,13 @@ function getTrafficSources(sessions: AnalyticsSession[]) {
   })) satisfies SourceMetric[];
 }
 
-function buildMinuteTimeline(events: AnalyticsEvent[]) {
+function buildMinuteTimeline(events: AnalyticsEvent[], range: DateRange) {
   const now = Date.now();
+  const liveRange = range.selectedDate === getDateRange().selectedDate;
 
   return Array.from({ length: 12 }, (_, index) => {
-    const start = now - (11 - index) * 60_000;
-    const end = start + 60_000;
+    const start = liveRange ? now - (11 - index) * 60_000 : range.startMs + index * 2 * 60 * 60_000;
+    const end = liveRange ? start + 60_000 : start + 2 * 60 * 60_000;
     const value = new Set(
       events
         .filter((event) => event.occurredAt >= start && event.occurredAt < end)
@@ -329,12 +702,13 @@ function buildMinuteTimeline(events: AnalyticsEvent[]) {
   });
 }
 
-function buildHourlyTimeline(sessions: AnalyticsSession[]) {
+function buildHourlyTimeline(sessions: AnalyticsSession[], range: DateRange) {
   const now = Date.now();
+  const liveRange = range.selectedDate === getDateRange().selectedDate;
 
   return Array.from({ length: 12 }, (_, index) => {
-    const start = now - (11 - index) * 60 * 60_000;
-    const end = start + 60 * 60_000;
+    const start = liveRange ? now - (11 - index) * 60 * 60_000 : range.startMs + index * 2 * 60 * 60_000;
+    const end = liveRange ? start + 60 * 60_000 : start + 2 * 60 * 60_000;
     const value = sessions.filter((session) => session.startedAt >= start && session.startedAt < end).length;
 
     return {
@@ -344,12 +718,13 @@ function buildHourlyTimeline(sessions: AnalyticsSession[]) {
   });
 }
 
-function buildPageViewsTimeline(events: AnalyticsEvent[]) {
+function buildPageViewsTimeline(events: AnalyticsEvent[], range: DateRange) {
   const now = Date.now();
+  const liveRange = range.selectedDate === getDateRange().selectedDate;
 
   return Array.from({ length: 12 }, (_, index) => {
-    const start = now - (11 - index) * 5 * 60_000;
-    const end = start + 5 * 60_000;
+    const start = liveRange ? now - (11 - index) * 5 * 60_000 : range.startMs + index * 2 * 60 * 60_000;
+    const end = liveRange ? start + 5 * 60_000 : start + 2 * 60 * 60_000;
     const value = events.filter(
       (event) =>
         event.occurredAt >= start &&
@@ -425,11 +800,11 @@ function parseDevice(userAgent: string): VisitorDevice {
       ? "macOS"
       : /iphone|ipad|ios/i.test(userAgent)
         ? "iOS"
-        : /android/i.test(userAgent)
-          ? "Android"
-          : /linux/i.test(userAgent)
-            ? "Linux"
-            : "Unknown";
+      : /android/i.test(userAgent)
+        ? "Android"
+        : /linux/i.test(userAgent)
+          ? "Linux"
+          : "Unknown";
   const device = /mobile|iphone|android/i.test(userAgent)
     ? "Mobile"
     : /ipad|tablet/i.test(userAgent)
@@ -489,4 +864,52 @@ function sanitize(value: unknown) {
 
 function createId(prefix: string) {
   return prefix + "_" + crypto.randomUUID();
+}
+
+function getDateRange(date?: string): DateRange {
+  const selectedDate = /^\d{4}-\d{2}-\d{2}$/.test(date || "") ? String(date) : formatDateInput(new Date());
+  const start = new Date(selectedDate + "T00:00:00");
+  const end = new Date(start);
+  end.setDate(start.getDate() + 1);
+
+  return {
+    startMs: start.getTime(),
+    endMs: end.getTime(),
+    selectedDate,
+  };
+}
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return year + "-" + month + "-" + day;
+}
+
+function unknownLocation(): VisitorLocation {
+  return {
+    city: "Unknown",
+    state: "Unknown",
+    country: "Unknown",
+    timezone: "Unknown",
+    latitude: null,
+    longitude: null,
+  };
+}
+
+function unknownDevice(): VisitorDevice {
+  return {
+    browser: "Unknown",
+    os: "Unknown",
+    device: "Unknown",
+  };
+}
+
+function defaultFeatureUsage(): FeatureUsage {
+  return {
+    calculator: false,
+    ai_receptionist: false,
+    calendar: false,
+  };
 }

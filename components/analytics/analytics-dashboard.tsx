@@ -32,15 +32,18 @@ const emptySnapshot: AnalyticsSnapshot = {
   sessionsPerHour: [],
   pageViewsTimeline: [],
   generatedAt: Date.now(),
+  selectedDate: formatDateInput(new Date()),
 };
 
 export function AnalyticsDashboard({ initialSnapshot }: { initialSnapshot: AnalyticsSnapshot }) {
   const [snapshot, setSnapshot] = useState(initialSnapshot || emptySnapshot);
   const [lastUpdated, setLastUpdated] = useState(initialSnapshot.generatedAt);
   const [isLive, setIsLive] = useState(true);
+  const [selectedDate, setSelectedDate] = useState(initialSnapshot.selectedDate || formatDateInput(new Date()));
+  const isToday = selectedDate === formatDateInput(new Date());
 
   useEffect(() => {
-    const stream = new EventSource("/api/analytics/stream");
+    const stream = new EventSource("/api/analytics/stream?date=" + encodeURIComponent(selectedDate));
 
     stream.addEventListener("snapshot", (event) => {
       const nextSnapshot = JSON.parse((event as MessageEvent).data) as AnalyticsSnapshot;
@@ -54,10 +57,10 @@ export function AnalyticsDashboard({ initialSnapshot }: { initialSnapshot: Analy
     });
 
     return () => stream.close();
-  }, []);
+  }, [selectedDate]);
 
   const refresh = async () => {
-    const response = await fetch("/api/analytics/summary", { cache: "no-store" });
+    const response = await fetch("/api/analytics/summary?date=" + encodeURIComponent(selectedDate), { cache: "no-store" });
 
     if (response.ok) {
       const nextSnapshot = (await response.json()) as AnalyticsSnapshot;
@@ -78,6 +81,15 @@ export function AnalyticsDashboard({ initialSnapshot }: { initialSnapshot: Analy
             <span className={isLive ? styles.liveDot : styles.offlineDot} />
             {isLive ? "Live" : "Reconnecting"}
           </span>
+          <label className={styles.datePicker}>
+            Date
+            <input
+              max={formatDateInput(new Date())}
+              onChange={(event) => setSelectedDate(event.target.value)}
+              type="date"
+              value={selectedDate}
+            />
+          </label>
           <span className={styles.timestamp}>Last updated {formatTime(lastUpdated)}</span>
           <button className={styles.iconButton} type="button" onClick={refresh} aria-label="Refresh analytics">
             Refresh
@@ -92,15 +104,15 @@ export function AnalyticsDashboard({ initialSnapshot }: { initialSnapshot: Analy
 
       <section className={styles.metricGrid} aria-label="Top metrics">
         <MetricCard label="Active Visitors" value={snapshot.metrics.activeVisitors} live />
-        <MetricCard label="Visitors Today" value={snapshot.metrics.visitorsToday} />
-        <MetricCard label="Total Sessions Today" value={snapshot.metrics.totalSessionsToday} />
-        <MetricCard label="Page Views Today" value={snapshot.metrics.pageViewsToday} />
+        <MetricCard label={isToday ? "Visitors Today" : "Visitors"} value={snapshot.metrics.visitorsToday} />
+        <MetricCard label={isToday ? "Total Sessions Today" : "Total Sessions"} value={snapshot.metrics.totalSessionsToday} />
+        <MetricCard label={isToday ? "Page Views Today" : "Page Views"} value={snapshot.metrics.pageViewsToday} />
         <MetricCard label="Average Session Duration" value={formatDuration(snapshot.metrics.averageSessionDurationSeconds)} />
         <MetricCard label="Bounce Rate" value={snapshot.metrics.bounceRate + "%"} />
       </section>
 
       <section className={styles.dashboardGrid}>
-        <Panel title="Live Active Users" className={styles.widePanel}>
+        <Panel title={isToday ? "Live Active Users" : "Users on Selected Date"} className={styles.widePanel}>
           <ActiveUsersTable users={snapshot.activeUsers} />
         </Panel>
 
@@ -202,8 +214,8 @@ function ActiveUsersTable({ users }: { users: AnalyticsSession[] }) {
             users.map((user) => (
               <tr key={user.sessionId}>
                 <td>
-                  <span className={styles.activePill}>
-                    <span /> Active
+                  <span className={isLiveActive(user) ? styles.activePill : styles.endedPill}>
+                    <span /> {isLiveActive(user) ? "Active" : "Ended"}
                   </span>
                 </td>
                 <td>{user.currentPage}</td>
@@ -412,6 +424,18 @@ function formatTime(value: number) {
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+function formatDateInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return year + "-" + month + "-" + day;
+}
+
+function isLiveActive(user: AnalyticsSession) {
+  return !user.endedAt && Date.now() - user.lastActivityAt <= 45_000;
 }
 
 function formatDuration(seconds: number) {

@@ -4,11 +4,12 @@ import { getAnalyticsSnapshot, subscribeToAnalytics } from "../../../../lib/anal
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export async function GET() {
+export async function GET(request: Request) {
   if (!(await isAnalyticsAdminAuthenticated())) {
     return new Response("Unauthorized", { status: 401 });
   }
 
+  const date = new URL(request.url).searchParams.get("date") || undefined;
   const encoder = new TextEncoder();
   let unsubscribe = () => {};
   let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -21,8 +22,10 @@ export async function GET() {
         );
       };
 
-      send("snapshot", getAnalyticsSnapshot());
-      unsubscribe = subscribeToAnalytics((snapshot) => send("snapshot", snapshot));
+      void getAnalyticsSnapshot(date).then((snapshot) => send("snapshot", snapshot));
+      unsubscribe = subscribeToAnalytics(() => {
+        void getAnalyticsSnapshot(date).then((snapshot) => send("snapshot", snapshot));
+      });
       heartbeat = setInterval(() => send("heartbeat", { at: Date.now() }), 25_000);
     },
     cancel() {

@@ -121,4 +121,5 @@ export type AnalyticsSnapshot = {
   sessionsPerHour: TimelinePoint[];
   pageViewsTimeline: TimelinePoint[];
   generatedAt: number;
+  selectedDate?: string;
 };
