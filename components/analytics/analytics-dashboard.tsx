@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type {
   AnalyticsSession,
@@ -38,7 +38,28 @@ export function AnalyticsDashboard({ initialSnapshot }: { initialSnapshot: Analy
   const [lastUpdated, setLastUpdated] = useState(initialSnapshot.generatedAt);
   const [isLive, setIsLive] = useState(true);
   const [selectedDate, setSelectedDate] = useState(initialSnapshot.selectedDate || formatDateInput(new Date()));
+  const isRefreshingRef = useRef(false);
   const isToday = selectedDate === formatDateInput(new Date());
+
+  const refresh = useCallback(async () => {
+    if (isRefreshingRef.current) {
+      return;
+    }
+
+    isRefreshingRef.current = true;
+
+    try {
+      const response = await fetch("/api/analytics/summary?date=" + encodeURIComponent(selectedDate), { cache: "no-store" });
+
+      if (response.ok) {
+        const nextSnapshot = (await response.json()) as AnalyticsSnapshot;
+        setSnapshot(nextSnapshot);
+        setLastUpdated(nextSnapshot.generatedAt);
+      }
+    } finally {
+      isRefreshingRef.current = false;
+    }
+  }, [selectedDate]);
 
   useEffect(() => {
     const stream = new EventSource("/api/analytics/stream?date=" + encodeURIComponent(selectedDate));
@@ -57,15 +78,13 @@ export function AnalyticsDashboard({ initialSnapshot }: { initialSnapshot: Analy
     return () => stream.close();
   }, [selectedDate]);
 
-  const refresh = async () => {
-    const response = await fetch("/api/analytics/summary?date=" + encodeURIComponent(selectedDate), { cache: "no-store" });
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      void refresh();
+    }, 10_000);
 
-    if (response.ok) {
-      const nextSnapshot = (await response.json()) as AnalyticsSnapshot;
-      setSnapshot(nextSnapshot);
-      setLastUpdated(nextSnapshot.generatedAt);
-    }
-  };
+    return () => window.clearInterval(interval);
+  }, [refresh]);
 
   return (
     <main className={styles.shell}>
@@ -79,6 +98,7 @@ export function AnalyticsDashboard({ initialSnapshot }: { initialSnapshot: Analy
             <span className={isLive ? styles.liveDot : styles.offlineDot} />
             {isLive ? "Live" : "Reconnecting"}
           </span>
+          <span className={styles.timestamp}>Auto-refresh every 10s</span>
           <span className={styles.timestamp}>Last updated {formatTime(lastUpdated)}</span>
           <button className={styles.iconButton} type="button" onClick={refresh} aria-label="Refresh analytics">
             Refresh
