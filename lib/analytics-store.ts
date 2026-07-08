@@ -740,16 +740,16 @@ function buildPageViewsTimeline(events: AnalyticsEvent[], range: DateRange) {
 function inferLocation(request: Request, payload: AnalyticsPayload): VisitorLocation {
   const fallbackLocation = payload.location || {};
   const country =
-    request.headers.get("x-vercel-ip-country") ||
     sanitize(fallbackLocation.country) ||
+    decodeHeaderValue(request.headers.get("x-vercel-ip-country")) ||
     "Unknown";
   const state =
-    request.headers.get("x-vercel-ip-country-region") ||
     sanitize(fallbackLocation.state) ||
+    decodeHeaderValue(request.headers.get("x-vercel-ip-country-region")) ||
     "Unknown";
   const city =
-    request.headers.get("x-vercel-ip-city") ||
     sanitize(fallbackLocation.city) ||
+    decodeHeaderValue(request.headers.get("x-vercel-ip-city")) ||
     "Unknown";
   const latitude = parseHeaderNumber(request.headers.get("x-vercel-ip-latitude"));
   const longitude = parseHeaderNumber(request.headers.get("x-vercel-ip-longitude"));
@@ -858,6 +858,18 @@ function normalizePath(path: string) {
 
 function sanitize(value: unknown) {
   return typeof value === "string" ? value.trim().slice(0, 300) : "";
+}
+
+function decodeHeaderValue(value: string | null) {
+  if (!value) {
+    return "";
+  }
+
+  try {
+    return decodeURIComponent(value).trim().slice(0, 300);
+  } catch {
+    return value.trim().slice(0, 300);
+  }
 }
 
 function createId(prefix: string) {

@@ -232,9 +232,9 @@ function VisitorsTable({ users }: { users: AnalyticsSession[] }) {
                   </span>
                 </td>
                 <td>{user.currentPage}</td>
-                <td>{user.location.city}</td>
-                <td>{user.location.state}</td>
-                <td>{user.location.country}</td>
+                <td>{formatLocationPart(user.location.city)}</td>
+                <td>{formatRegionName(user.location.state, user.location.country)}</td>
+                <td>{formatCountryName(user.location.country)}</td>
                 <td>{user.device.device}</td>
                 <td>{user.device.browser}</td>
                 <td>{user.device.os}</td>
@@ -302,11 +302,11 @@ function VisitorMap({ users }: { users: AnalyticsSession[] }) {
             key={user.sessionId}
             style={mapDotPosition(user, index)}
             title={
-              user.location.city +
+              formatLocationPart(user.location.city) +
               ", " +
-              user.location.state +
+              formatRegionName(user.location.state, user.location.country) +
               ", " +
-              user.location.country +
+              formatCountryName(user.location.country) +
               " - 1 visitor"
             }
           />
@@ -397,6 +397,63 @@ function formatDuration(seconds: number) {
   }
 
   return minutes + "m " + String(remainingSeconds).padStart(2, "0") + "s";
+}
+
+function formatLocationPart(value: string) {
+  if (!value || value === "Unknown") {
+    return "Unknown";
+  }
+
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
+}
+
+function formatCountryName(value: string) {
+  const decodedValue = formatLocationPart(value);
+
+  if (/^[A-Z]{2}$/.test(decodedValue)) {
+    try {
+      return new Intl.DisplayNames(["en"], { type: "region" }).of(decodedValue) || decodedValue;
+    } catch {
+      return decodedValue;
+    }
+  }
+
+  return decodedValue;
+}
+
+function formatRegionName(value: string, country: string) {
+  const decodedValue = formatLocationPart(value);
+  const countryCode = formatLocationPart(country).toUpperCase();
+  const key = countryCode + ":" + decodedValue.toUpperCase();
+  const knownRegions: Record<string, string> = {
+    "IN:DL": "National Capital Territory of Delhi",
+    "IN:MH": "Maharashtra",
+    "IN:KA": "Karnataka",
+    "IN:TN": "Tamil Nadu",
+    "IN:TG": "Telangana",
+    "IN:GJ": "Gujarat",
+    "IN:RJ": "Rajasthan",
+    "IN:UP": "Uttar Pradesh",
+    "IN:HR": "Haryana",
+    "IN:PB": "Punjab",
+    "IN:WB": "West Bengal",
+    "US:CA": "California",
+    "US:NY": "New York",
+    "US:TX": "Texas",
+    "US:FL": "Florida",
+    "US:WA": "Washington",
+    "US:IL": "Illinois",
+    "US:PA": "Pennsylvania",
+    "US:GA": "Georgia",
+    "US:NC": "North Carolina",
+    "US:OH": "Ohio",
+  };
+
+  return knownRegions[key] || decodedValue;
 }
 
 function mapDotPosition(user: AnalyticsSession, index: number): CSSProperties {
