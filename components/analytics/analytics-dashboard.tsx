@@ -1,12 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import type {
-  AnalyticsEvent,
   AnalyticsSession,
   AnalyticsSnapshot,
-  PageMetric,
   SourceMetric,
   TimelinePoint,
 } from "../../lib/analytics-types";
@@ -81,15 +79,6 @@ export function AnalyticsDashboard({ initialSnapshot }: { initialSnapshot: Analy
             <span className={isLive ? styles.liveDot : styles.offlineDot} />
             {isLive ? "Live" : "Reconnecting"}
           </span>
-          <label className={styles.datePicker}>
-            Date
-            <input
-              max={formatDateInput(new Date())}
-              onChange={(event) => setSelectedDate(event.target.value)}
-              type="date"
-              value={selectedDate}
-            />
-          </label>
           <span className={styles.timestamp}>Last updated {formatTime(lastUpdated)}</span>
           <button className={styles.iconButton} type="button" onClick={refresh} aria-label="Refresh analytics">
             Refresh
@@ -111,21 +100,29 @@ export function AnalyticsDashboard({ initialSnapshot }: { initialSnapshot: Analy
         <MetricCard label="Bounce Rate" value={snapshot.metrics.bounceRate + "%"} />
       </section>
 
+      <section className={styles.dateBand}>
+        <div>
+          <span className={styles.eyebrow}>{isToday ? "Today" : "Selected Date"}</span>
+          <h2>{formatReadableDate(selectedDate)} Visitors</h2>
+        </div>
+        <label className={styles.largeDatePicker}>
+          Date
+          <input
+            max={formatDateInput(new Date())}
+            onChange={(event) => setSelectedDate(event.target.value)}
+            type="date"
+            value={selectedDate}
+          />
+        </label>
+      </section>
+
       <section className={styles.dashboardGrid}>
-        <Panel title={isToday ? "Live Active Users" : "Users on Selected Date"} className={styles.widePanel}>
-          <ActiveUsersTable users={snapshot.activeUsers} />
+        <Panel title={isToday ? "Today's Visitors" : "Visitors on Selected Date"} className={styles.fullPanel}>
+          <VisitorsTable users={snapshot.activeUsers} />
         </Panel>
 
         <Panel title="Top Visitor Regions">
           <RegionList regions={snapshot.topRegions} />
-        </Panel>
-
-        <Panel title="Live Activity Feed">
-          <ActivityFeed events={snapshot.activityFeed} />
-        </Panel>
-
-        <Panel title="Most Visited Pages">
-          <PageBars pages={snapshot.mostVisitedPages} />
         </Panel>
 
         <Panel title="Real-Time Map" className={styles.mapPanel}>
@@ -134,10 +131,6 @@ export function AnalyticsDashboard({ initialSnapshot }: { initialSnapshot: Analy
 
         <Panel title="Traffic Sources">
           <TrafficSources sources={snapshot.trafficSources} />
-        </Panel>
-
-        <Panel title="Recent Visitors" className={styles.widePanel}>
-          <RecentVisitors users={snapshot.recentVisitors} />
         </Panel>
 
         <Panel title="Visitors per Minute">
@@ -187,7 +180,7 @@ function Panel({
   );
 }
 
-function ActiveUsersTable({ users }: { users: AnalyticsSession[] }) {
+function VisitorsTable({ users }: { users: AnalyticsSession[] }) {
   return (
     <div className={styles.tableWrap}>
       <table>
@@ -234,7 +227,7 @@ function ActiveUsersTable({ users }: { users: AnalyticsSession[] }) {
                 <td>
                   <UsageBadge used={Boolean(user.featureUsage?.calendar)} />
                 </td>
-                <td>{formatDuration(Math.round((Date.now() - user.startedAt) / 1000))}</td>
+                <td>{formatDuration(getSessionDurationSeconds(user))}</td>
                 <td>{formatTime(user.firstSeenAt)}</td>
                 <td>{formatTime(user.lastActivityAt)}</td>
               </tr>
@@ -242,7 +235,7 @@ function ActiveUsersTable({ users }: { users: AnalyticsSession[] }) {
           ) : (
             <tr>
               <td colSpan={14} className={styles.emptyCell}>
-                Waiting for live visitors.
+                No visitors recorded for this date.
               </td>
             </tr>
           )}
@@ -270,43 +263,6 @@ function RegionList({ regions }: { regions: AnalyticsSnapshot["topRegions"] }) {
             <small>{region.country}</small>
           </span>
           <strong>{region.visitorCount}</strong>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function ActivityFeed({ events }: { events: AnalyticsEvent[] }) {
-  if (!events.length) {
-    return <EmptyState text="Activity will appear here as visitors move through the site." />;
-  }
-
-  return (
-    <div className={styles.feed}>
-      {events.map((event) => (
-        <article className={styles.feedItem} key={event.id}>
-          <time>{formatTime(event.occurredAt)}</time>
-          <span>{eventLabel(event)}</span>
-        </article>
-      ))}
-    </div>
-  );
-}
-
-function PageBars({ pages }: { pages: PageMetric[] }) {
-  const max = Math.max(1, ...pages.map((page) => page.views));
-
-  return (
-    <div className={styles.pageBars}>
-      {pages.map((page) => (
-        <div className={styles.pageBarRow} key={page.page}>
-          <div>
-            <span>{page.page}</span>
-            <strong>{page.views}</strong>
-          </div>
-          <span className={styles.progressTrack}>
-            <span style={{ width: Math.max(4, (page.views / max) * 100) + "%" }} />
-          </span>
         </div>
       ))}
     </div>
@@ -358,47 +314,6 @@ function TrafficSources({ sources }: { sources: SourceMetric[] }) {
   );
 }
 
-function RecentVisitors({ users }: { users: AnalyticsSession[] }) {
-  return (
-    <div className={styles.tableWrap}>
-      <table>
-        <thead>
-          <tr>
-            <th>Time</th>
-            <th>Country</th>
-            <th>Region</th>
-            <th>Current Page</th>
-            <th>Session Duration</th>
-            <th>Visitor ID</th>
-            <th>Lead ID</th>
-          </tr>
-        </thead>
-        <tbody>
-          {users.length ? (
-            users.map((user) => (
-              <tr key={user.sessionId}>
-                <td>{formatTime(user.firstSeenAt)}</td>
-                <td>{user.location.country}</td>
-                <td>{user.location.state}</td>
-                <td>{user.currentPage}</td>
-                <td>{formatDuration(Math.round(((user.endedAt || user.lastActivityAt) - user.startedAt) / 1000))}</td>
-                <td className={styles.mono}>{shortId(user.visitorId)}</td>
-                <td className={styles.mono}>{user.leadId || "Unknown"}</td>
-              </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={7} className={styles.emptyCell}>
-                No visitors recorded today.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
 function MiniChart({ points }: { points: TimelinePoint[] }) {
   const max = Math.max(1, ...points.map((point) => point.value));
 
@@ -434,8 +349,22 @@ function formatDateInput(date: Date) {
   return year + "-" + month + "-" + day;
 }
 
+function formatReadableDate(value: string) {
+  return new Date(value + "T00:00:00").toLocaleDateString("en-US", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function isLiveActive(user: AnalyticsSession) {
   return !user.endedAt && Date.now() - user.lastActivityAt <= 45_000;
+}
+
+function getSessionDurationSeconds(user: AnalyticsSession) {
+  const end = isLiveActive(user) ? Date.now() : user.endedAt || user.lastActivityAt;
+
+  return Math.round(Math.max(0, end - user.startedAt) / 1000);
 }
 
 function formatDuration(seconds: number) {
@@ -448,38 +377,6 @@ function formatDuration(seconds: number) {
   }
 
   return minutes + "m " + String(remainingSeconds).padStart(2, "0") + "s";
-}
-
-function eventLabel(event: AnalyticsEvent) {
-  if (event.name === "session_started") {
-    return "Visitor landed on " + event.page;
-  }
-
-  if (event.name === "page_view") {
-    return event.page + " opened";
-  }
-
-  if (event.name === "heartbeat") {
-    return "Visitor active on " + event.page;
-  }
-
-  if (event.name === "session_ended") {
-    return "Visitor left from " + event.page;
-  }
-
-  if (event.name === "chat_started") {
-    return "AI Chat started";
-  }
-
-  if (event.name === "appointment_booked") {
-    return "Appointment booked";
-  }
-
-  return "Visitor event on " + event.page;
-}
-
-function shortId(value: string) {
-  return value.replace(/^visitor_/, "").slice(0, 8);
 }
 
 function mapDotPosition(user: AnalyticsSession, index: number): CSSProperties {

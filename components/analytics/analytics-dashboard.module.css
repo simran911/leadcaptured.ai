@@ -44,8 +44,7 @@
 .liveStatus,
 .timestamp,
 .iconButton,
-.secondaryButton,
-.datePicker {
+.secondaryButton {
   align-items: center;
   background: #fff;
   border: 1px solid #e2e8f0;
@@ -58,21 +57,6 @@
   gap: 8px;
   min-height: 38px;
   padding: 0 12px;
-}
-
-.datePicker {
-  color: #64748b;
-  font-size: 12px;
-  text-transform: uppercase;
-}
-
-.datePicker input {
-  border: 0;
-  color: #334155;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 900;
-  outline: 0;
 }
 
 .iconButton,
@@ -107,7 +91,8 @@
 }
 
 .metricGrid,
-.dashboardGrid {
+.dashboardGrid,
+.dateBand {
   margin: 0 auto;
   max-width: 1560px;
 }
@@ -173,6 +158,48 @@
   grid-template-columns: repeat(12, minmax(0, 1fr));
 }
 
+.dateBand {
+  align-items: center;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.06), 0 1px 2px rgba(15, 23, 42, 0.05);
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  padding: 18px;
+}
+
+.dateBand h2 {
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.2;
+  margin: 4px 0 0;
+}
+
+.largeDatePicker {
+  align-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  color: #64748b;
+  display: inline-flex;
+  font-size: 12px;
+  font-weight: 900;
+  gap: 10px;
+  min-height: 44px;
+  padding: 0 12px;
+  text-transform: uppercase;
+}
+
+.largeDatePicker input {
+  border: 0;
+  color: #0f172a;
+  font: inherit;
+  font-size: 15px;
+  outline: 0;
+}
+
 .panel {
   grid-column: span 4;
   min-height: 300px;
@@ -182,6 +209,10 @@
 
 .widePanel {
   grid-column: span 8;
+}
+
+.fullPanel {
+  grid-column: 1 / -1;
 }
 
 .mapPanel {
@@ -203,23 +234,45 @@
 }
 
 .tableWrap {
-  overflow-x: auto;
+  max-height: 520px;
+  overflow: auto;
+  scrollbar-color: #94a3b8 #e2e8f0;
+  scrollbar-width: thin;
   width: 100%;
+}
+
+.tableWrap::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+.tableWrap::-webkit-scrollbar-track {
+  background: #e2e8f0;
+  border-radius: 999px;
+}
+
+.tableWrap::-webkit-scrollbar-thumb {
+  background: #94a3b8;
+  border-radius: 999px;
 }
 
 .tableWrap table {
   border-collapse: collapse;
-  min-width: 900px;
+  min-width: 1320px;
   width: 100%;
 }
 
 .tableWrap th {
+  background: #fff;
   color: #64748b;
   font-size: 11px;
   letter-spacing: 0.5px;
   padding: 11px 10px;
+  position: sticky;
+  top: 0;
   text-align: left;
   text-transform: uppercase;
+  z-index: 1;
 }
 
 .tableWrap td {
@@ -620,6 +673,11 @@
     display: grid;
   }
 
+  .dateBand {
+    align-items: stretch;
+    display: grid;
+  }
+
   .headerActions {
     justify-content: flex-start;
     min-width: 0;
@@ -632,6 +690,7 @@
 
   .panel,
   .widePanel,
+  .fullPanel,
   .mapPanel,
   .metricCard {
     grid-column: span 1;

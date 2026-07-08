@@ -461,9 +461,7 @@ function buildSnapshotFromMemory(range: DateRange) {
 
 function buildSnapshot(sessions: AnalyticsSession[], events: AnalyticsEvent[], range: DateRange) {
   const now = Date.now();
-  const isToday = range.selectedDate === getDateRange().selectedDate;
   const activeUsers = sessions
-    .filter((session) => (isToday ? isActive(session, now) : true))
     .sort((a, b) => b.lastActivityAt - a.lastActivityAt);
   const pageViewsToday = events.filter((event) => event.name === "page_view" || event.name === "session_started").length;
   const uniqueVisitors = new Set(sessions.map((session) => session.visitorId));
