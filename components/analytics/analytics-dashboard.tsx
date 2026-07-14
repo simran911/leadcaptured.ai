@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { CSSProperties, ReactNode } from "react";
+import type { ReactNode } from "react";
 import type {
   AnalyticsSession,
   AnalyticsSnapshot,
@@ -9,6 +9,7 @@ import type {
   TimelinePoint,
 } from "../../lib/analytics-types";
 import styles from "./analytics-dashboard.module.css";
+import { VisitorMap } from "./visitor-map";
 
 const emptySnapshot: AnalyticsSnapshot = {
   metrics: {
@@ -289,35 +290,6 @@ function RegionList({ regions }: { regions: AnalyticsSnapshot["topRegions"] }) {
   );
 }
 
-function VisitorMap({ users }: { users: AnalyticsSession[] }) {
-  const visibleUsers = users.slice(0, 18);
-
-  return (
-    <div className={styles.mapCanvas}>
-      <div className={styles.mapGrid} />
-      {visibleUsers.length ? (
-        visibleUsers.map((user, index) => (
-          <span
-            className={styles.mapDot}
-            key={user.sessionId}
-            style={mapDotPosition(user, index)}
-            title={
-              formatLocationPart(user.location.city) +
-              ", " +
-              formatRegionName(user.location.state, user.location.country) +
-              ", " +
-              formatCountryName(user.location.country) +
-              " - 1 visitor"
-            }
-          />
-        ))
-      ) : (
-        <div className={styles.mapEmpty}>Live visitor locations will cluster here.</div>
-      )}
-    </div>
-  );
-}
-
 function TrafficSources({ sources }: { sources: SourceMetric[] }) {
   const max = Math.max(1, ...sources.map((source) => source.visitors));
 
@@ -454,29 +426,4 @@ function formatRegionName(value: string, country: string) {
   };
 
   return knownRegions[key] || decodedValue;
-}
-
-function mapDotPosition(user: AnalyticsSession, index: number): CSSProperties {
-  if (typeof user.location.latitude === "number" && typeof user.location.longitude === "number") {
-    return {
-      left: ((user.location.longitude + 180) / 360) * 100 + "%",
-      top: ((90 - user.location.latitude) / 180) * 100 + "%",
-    };
-  }
-
-  const fallback = [
-    [23, 42],
-    [18, 50],
-    [49, 39],
-    [72, 48],
-    [61, 58],
-    [34, 63],
-    [82, 31],
-    [54, 46],
-  ][index % 8];
-
-  return {
-    left: fallback[0] + "%",
-    top: fallback[1] + "%",
-  };
 }
