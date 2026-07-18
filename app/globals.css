@@ -2570,12 +2570,32 @@ input[type="range"]::-webkit-slider-thumb {
   .calendar-section {
     height: 92svh;
     min-height: 680px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-color: #168eea rgba(16, 33, 31, 0.12);
+    scrollbar-width: thin;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
   }
 
   .calendar-section iframe {
-    height: calc(100% + 56px);
+    height: calc(100% + 28px);
     min-height: 760px;
-    transform: translateY(-28px);
+    transform: none;
+  }
+
+  .calendar-section::-webkit-scrollbar {
+    width: 7px;
+  }
+
+  .calendar-section::-webkit-scrollbar-track {
+    background: rgba(16, 33, 31, 0.12);
+  }
+
+  .calendar-section::-webkit-scrollbar-thumb {
+    background: #168eea;
+    border-radius: 999px;
   }
 }
 
